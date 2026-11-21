@@ -214,6 +214,9 @@ OUTPUT:
    -rdbtb, -result-db-table string        table/collection name (default "results")
    -rdbbs, -result-db-batch-size int      batch size for database inserts (default 100)
    -rdbor, -result-db-omit-raw            omit raw request/response data from database
+   -result-classification                 categorize each result by outcome (ok, connection_refused, timeout, tls_failure, redirect_loop, empty_body, other)
+   -result-classification-output string   file to stream classification records and the batch summary to (JSONL); implies -result-classification
+   -result-anomaly-threshold int          share in percent above which a non-ok category is flagged as anomalous (default 30)
 
 CONFIGURATIONS:
    -config string                   path to the httpx configuration file (default $HOME/.config/httpx/config.yaml)
@@ -300,6 +303,42 @@ httpx -l hosts.txt -fpt error,parked -ptm /opt/httpx/model.json
 The path selects a local model and bypasses automatic model discovery and downloading. A missing or unreadable model, or invalid model JSON, stops initialization instead of falling back to a download. Classification remains opt-in: use `-kb` or `-fpt` (the deprecated `-fep` is also supported). Setting `-ptm` alone does not load the model or enable classification. Library users can set `Options.PageTypeModel` alongside `KnowledgeBase` or `OutputFilterPageType`. Without a custom path, the existing model discovery and download behavior is unchanged.
 
 Explicit models must also pass a page and form classification check before scanning starts or existing output indexes are changed. This checks that the model can run, rather than certifying every part of its contents. A later classification error leaves that response without page-type information; diagnostics are available with `-debug`.
+
+### Result outcome classification
+
+`-result-classification` assigns every result — including failures, which the normal output drops when `-probe` is off — to exactly one outcome category. The categorization runs on the result side only: probing, retries and failure handling are unchanged, and existing outputs and exit codes stay byte-identical while the flag is off.
+
+Categories (taxonomy version `1.0`, recorded in every record as `taxonomy_version`):
+
+| category | meaning |
+|---|---|
+| `ok` | a response was received and its body is not empty |
+| `connection_refused` | the remote host actively refused the connection (`ECONNREFUSED`) |
+| `timeout` | the request exceeded its deadline or was canceled |
+| `tls_failure` | the TLS handshake or a TLS-level operation failed |
+| `redirect_loop` | redirect following stopped at the limit while the last response still redirects |
+| `empty_body` | a response was received but carries an empty body |
+| `other` | any unmodeled error shape; its original error text is kept in `raw_error` |
+
+One outcome can match several rules (e.g. a TLS handshake timing out). A fixed priority — `timeout` → `connection_refused` → `tls_failure` → `redirect_loop` → `empty_body` → `ok`, with `other` as the fallback — guarantees a result is counted in one bucket only, so the per-category counts always sum to the total.
+
+```bash
+# annotate JSON results with result_category / result_category_version
+httpx -l hosts.txt -json -result-classification
+
+# stream one JSONL record per result plus a batch summary, and flag a
+# non-ok category once it accounts for at least 40% of the batch
+httpx -l hosts.txt -result-classification-output classification.jsonl -result-anomaly-threshold 40
+```
+
+The output file is JSONL: one `ClassificationRecord` per result, followed by one `batch_summary` record holding the fixed-order `counts`/`percent` distribution, any `anomalies`, and a per-target rollup (`categories` seen, per-category `counts`, and `transitions` such as `timeout -> ok`). Records are streamed as results arrive with bounded memory, so scans of 100k+ targets do not buffer outcomes. Because the field set is fixed and every record carries `taxonomy_version`, files from different batches can be diffed side by side and old files stay interpretable after the taxonomy grows.
+
+Limitations:
+
+- `-result-classification-output` implies `-result-classification`. The output path is checked for writability at startup; an unwritable path (or a missing directory) aborts before any probe runs.
+- Without an output file the classification still runs in memory and the batch summary is logged; library callers can read it via `Runner.ClassificationSummary()` and `Runner.ClassificationOfTarget(input)`.
+- A classification panic is contained: the result is bucketed as `other` with its raw error and a warning is emitted, but the scan continues.
+- The new JSON fields (`result_category`, `result_category_version`, `result_raw_error`) are omitted from CSV/Markdown headers, so those formats are unchanged; the result-db writers store them as columns.
 
 ## Common Recipes
 

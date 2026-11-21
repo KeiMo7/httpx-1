@@ -106,6 +106,13 @@ type Result struct {
 	FileNameHash       string                        `json:"-" csv:"-" md:"-" mapstructure:"-"`
 	CPE                []CPEInfo                     `json:"cpe,omitempty" csv:"cpe" md:"cpe" mapstructure:"cpe"`
 	WordPress          *WordPressInfo                `json:"wordpress,omitempty" csv:"wordpress" md:"wordpress" mapstructure:"wordpress"`
+	// ResultCategory / ResultCategoryVersion are populated only with
+	// -result-classification. They are intentionally absent from csv/md
+	// headers so existing output formats stay byte-identical when off.
+	ResultCategory        string `json:"result_category,omitempty" csv:"-" md:"-" mapstructure:"result_category"`
+	ResultCategoryVersion string `json:"result_category_version,omitempty" csv:"-" md:"-" mapstructure:"result_category_version"`
+	// ResultRawError preserves the original error text for unknown shapes.
+	ResultRawError string `json:"result_raw_error,omitempty" csv:"-" md:"-" mapstructure:"result_raw_error"`
 }
 
 type Trace struct {

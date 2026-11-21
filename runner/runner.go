@@ -102,6 +102,9 @@ type Runner struct {
 	authProvider       authprovider.AuthProvider
 	interruptCh        chan struct{}
 	pinnedProxyWarning sync.Once
+	// ledger is non-nil only when -result-classification is enabled. It owns
+	// the single classification path for every emitted result.
+	ledger *resultLedger
 }
 
 func (r *Runner) HTTPX() *httpx.HTTPX {
@@ -484,6 +487,18 @@ func New(options *Options) (*Runner, error) {
 				gologger.Error().Msgf("Failed to start API server: %s", err)
 			}
 		}()
+	}
+
+	if options.ResultClassification {
+		var sink io.WriteCloser
+		if options.ResultClassificationOutput != "" {
+			f, err := os.OpenFile(options.ResultClassificationOutput, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+			if err != nil {
+				return nil, errors.Wrap(err, "could not open result classification output")
+			}
+			sink = newBufferedWriteCloser(f)
+		}
+		runner.ledger = newResultLedger(sink, options.ResultAnomalyThresholdPct)
 	}
 
 	return runner, nil
@@ -1213,6 +1228,18 @@ func (r *Runner) RunEnumeration() {
 				}
 				gologger.Debug().Msgf("Failed '%s': %s\n", resp.URL, resp.Err)
 			}
+
+			// Classification is the only categorization path and runs before
+			// any filtering or the empty-str drop, so failed and filtered
+			// outcomes are still accounted for. Probing/error handling is
+			// untouched; only result-side annotation is added.
+			if r.ledger != nil {
+				category, rawErr := r.ledger.record(resp, r.options.FollowRedirects || r.options.FollowHostRedirects, r.options.MaxRedirects)
+				resp.ResultCategoryVersion = ResultCategoryVersion
+				resp.ResultCategory = category
+				resp.ResultRawError = rawErr
+			}
+
 			if resp.str == "" {
 				continue
 			}
@@ -1664,6 +1691,17 @@ func (r *Runner) RunEnumeration() {
 	close(output)
 
 	wgoutput.Wait()
+
+	if r.ledger != nil {
+		summary := r.ledger.summary()
+		r.ledger.close()
+		gologger.Info().Msgf("Result classification (taxonomy v%s): total=%d distribution=%s",
+			summary.TaxonomyVersion, summary.Total, formatCategoryCounts(summary.Counts))
+		for _, anomalous := range summary.Anomalies {
+			gologger.Warning().Msgf("Result classification: %s accounts for %.2f%% of results (>= %d%% threshold)",
+				anomalous, summary.Percent[anomalous], r.options.ResultAnomalyThresholdPct)
+		}
+	}
 
 	if r.scanopts.StoreVisionReconClusters {
 		visionReconClusters := filepath.Join(r.options.StoreResponseDir, "vision_recon_clusters.json")

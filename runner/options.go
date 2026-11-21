@@ -371,7 +371,19 @@ type Options struct {
 	HeadlessOptionalArguments goflags.StringSlice
 	Protocol                  string
 	OutputFilterErrorPagePath string
-	DisableStdout bool
+	DisableStdout             bool
+
+	// ResultClassification enables result-side outcome categorization
+	// (ok / connection_refused / timeout / tls_failure / redirect_loop /
+	// empty_body / other). It is opt-in and leaves probing untouched.
+	ResultClassification bool
+	// ResultClassificationOutput is the JSONL file the per-result records and
+	// the batch summary are streamed to. Empty means classification runs in
+	// memory and only the summary is logged / exposed to library callers.
+	ResultClassificationOutput string
+	// ResultAnomalyThresholdPct is the share (percent) above which a non-ok
+	// category is flagged as anomalous in the batch summary. 0 means default.
+	ResultAnomalyThresholdPct int
 
 	JavascriptCodes goflags.StringSlice
 
@@ -550,6 +562,9 @@ func ParseOptions() *Options {
 		flagSet.StringVarP(&options.ResultDatabaseTable, "result-db-table", "rdbtb", "results", "table/collection name"),
 		flagSet.IntVarP(&options.ResultDatabaseBatchSize, "result-db-batch-size", "rdbbs", 100, "batch size for database inserts"),
 		flagSet.BoolVarP(&options.ResultDatabaseOmitRaw, "result-db-omit-raw", "rdbor", false, "omit raw request/response data from database"),
+		flagSet.BoolVar(&options.ResultClassification, "result-classification", false, "categorize each result by outcome (ok, connection_refused, timeout, tls_failure, redirect_loop, empty_body, other)"),
+		flagSet.StringVar(&options.ResultClassificationOutput, "result-classification-output", "", "file to stream classification records and the batch summary to (JSONL); implies -result-classification"),
+		flagSet.IntVar(&options.ResultAnomalyThresholdPct, "result-anomaly-threshold", 30, "share in percent above which a non-ok category is flagged as anomalous"),
 	)
 
 	flagSet.CreateGroup("configs", "Configurations",
@@ -919,7 +934,38 @@ func (options *Options) ValidateOptions() error {
 		options.MaxResponseBodySizeToSave = int(httpxcommon.DefaultMaxResponseBodySize)
 	}
 
+	if options.ResultClassificationOutput != "" {
+		// an explicit output path turns classification on even without the flag
+		options.ResultClassification = true
+	}
+	if options.ResultClassification {
+		if options.ResultAnomalyThresholdPct < 0 || options.ResultAnomalyThresholdPct > 100 {
+			return fmt.Errorf("invalid result anomaly threshold %d: must be between 0 and 100", options.ResultAnomalyThresholdPct)
+		}
+		if options.ResultClassificationOutput != "" {
+			// reject an unwritable classification target at startup, before any
+			// probe runs, so a late permission error cannot waste a full scan
+			if err := checkWritable(options.ResultClassificationOutput); err != nil {
+				return fmt.Errorf("result classification output is not writable: %w", err)
+			}
+		}
+	}
+
 	return nil
+}
+
+// checkWritable verifies that path can be created and written, then restores
+// the filesystem state it found.
+func checkWritable(path string) error {
+	dir := filepath.Dir(path)
+	if dir != "" && !fileutil.FolderExists(dir) {
+		return fmt.Errorf("directory %q does not exist", dir)
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+	return f.Close()
 }
 
 // redundant with katana

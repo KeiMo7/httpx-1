@@ -157,7 +157,12 @@ func (p *postgresDatabase) EnsureSchema(ctx context.Context) error {
 			cpe JSONB,
 
 			-- WordPress plugins and themes
-			wordpress JSONB
+			wordpress JSONB,
+
+			-- Result-side outcome classification (-result-classification)
+			result_category TEXT,
+			result_category_version TEXT,
+			result_raw_error TEXT
 		);
 
 		-- Back-compat for databases whose schema was created before CPE support.
@@ -169,6 +174,9 @@ func (p *postgresDatabase) EnsureSchema(ctx context.Context) error {
 		ALTER TABLE %s ADD COLUMN IF NOT EXISTS cpe JSONB;
 		ALTER TABLE %s ADD COLUMN IF NOT EXISTS generator TEXT;
 		ALTER TABLE %s ADD COLUMN IF NOT EXISTS wordpress JSONB;
+		ALTER TABLE %s ADD COLUMN IF NOT EXISTS result_category TEXT;
+		ALTER TABLE %s ADD COLUMN IF NOT EXISTS result_category_version TEXT;
+		ALTER TABLE %s ADD COLUMN IF NOT EXISTS result_raw_error TEXT;
 
 		CREATE INDEX IF NOT EXISTS %s ON %s(timestamp DESC);
 		CREATE INDEX IF NOT EXISTS %s ON %s(url);
@@ -176,6 +184,9 @@ func (p *postgresDatabase) EnsureSchema(ctx context.Context) error {
 		CREATE INDEX IF NOT EXISTS %s ON %s(status_code);
 		CREATE INDEX IF NOT EXISTS %s ON %s USING GIN(tech);
 	`,
+		tableName,
+		tableName,
+		tableName,
 		tableName,
 		tableName,
 		tableName,
@@ -222,7 +233,8 @@ func (p *postgresDatabase) InsertBatch(ctx context.Context, results []runner.Res
 			chain, chain_status_codes,
 			headless_body, screenshot_bytes, screenshot_path, screenshot_path_rel, stored_response_path,
 			knowledgebase, link_request, trace,
-			cpe, wordpress
+			cpe, wordpress,
+			result_category, result_category_version, result_raw_error
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9,
 			$10, $11, $12, $13, $14, $15, $16,
@@ -235,7 +247,8 @@ func (p *postgresDatabase) InsertBatch(ctx context.Context, results []runner.Res
 			$54, $55,
 			$56, $57, $58, $59, $60,
 			$61, $62, $63,
-			$64, $65
+			$64, $65,
+			$66, $67, $68
 		)`, tableName)
 
 	stmt, err := tx.PrepareContext(ctx, query)
@@ -273,6 +286,7 @@ func (p *postgresDatabase) InsertBatch(ctx context.Context, results []runner.Res
 			r.HeadlessBody, r.ScreenshotBytes, r.ScreenshotPath, r.ScreenshotPathRel, r.StoredResponsePath,
 			kbJSON, linkReqJSON, traceJSON,
 			cpeJSON, wordpressJSON,
+			r.ResultCategory, r.ResultCategoryVersion, r.ResultRawError,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to insert result: %w", err)

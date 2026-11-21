@@ -158,6 +158,11 @@ func (m *mysqlDatabase) EnsureSchema(ctx context.Context) error {
 			-- WordPress plugins and themes
 			wordpress JSON,
 
+			-- Result-side outcome classification (-result-classification)
+			result_category TEXT,
+			result_category_version TEXT,
+			result_raw_error TEXT,
+
 			INDEX idx_timestamp (timestamp),
 			INDEX idx_url (url(255)),
 			INDEX idx_host (host),
@@ -183,6 +188,11 @@ func (m *mysqlDatabase) EnsureSchema(ctx context.Context) error {
 	}
 	if err := m.ensureColumn(ctx, "wordpress", "JSON"); err != nil {
 		return fmt.Errorf("failed to ensure wordpress column: %w", err)
+	}
+	for _, col := range []string{"result_category", "result_category_version", "result_raw_error"} {
+		if err := m.ensureColumn(ctx, col, "TEXT"); err != nil {
+			return fmt.Errorf("failed to ensure %s column: %w", col, err)
+		}
 	}
 
 	return nil
@@ -236,7 +246,8 @@ func (m *mysqlDatabase) InsertBatch(ctx context.Context, results []runner.Result
 			chain, chain_status_codes,
 			headless_body, screenshot_bytes, screenshot_path, screenshot_path_rel, stored_response_path,
 			knowledgebase, link_request, trace,
-			cpe, wordpress
+			cpe, wordpress,
+			result_category, result_category_version, result_raw_error
 		) VALUES (
 			?, ?, ?, ?, ?, ?, ?, ?, ?,
 			?, ?, ?, ?, ?, ?, ?,
@@ -249,7 +260,8 @@ func (m *mysqlDatabase) InsertBatch(ctx context.Context, results []runner.Result
 			?, ?,
 			?, ?, ?, ?, ?,
 			?, ?, ?,
-			?, ?
+			?, ?, ?,
+			?, ?, ?
 		)`, tableName)
 
 	stmt, err := tx.PrepareContext(ctx, query)
@@ -296,6 +308,7 @@ func (m *mysqlDatabase) InsertBatch(ctx context.Context, results []runner.Result
 			r.HeadlessBody, r.ScreenshotBytes, r.ScreenshotPath, r.ScreenshotPathRel, r.StoredResponsePath,
 			kbJSON, linkReqJSON, traceJSON,
 			cpeJSON, wordpressJSON,
+			r.ResultCategory, r.ResultCategoryVersion, r.ResultRawError,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to insert result: %w", err)
