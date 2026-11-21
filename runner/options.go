@@ -405,6 +405,19 @@ type Options struct {
 	Wappalyzer     *wappalyzer.Wappalyze
 	Networkpolicy  *networkpolicy.NetworkPolicy
 	CDNCheckClient *cdncheck.Client
+
+	// Diff mode: compare two httpx JSONL result sets instead of probing.
+	// When DiffMode is false none of these fields are read, so the default
+	// behavior of httpx is untouched (hard constraint 二.4).
+	DiffMode         bool
+	DiffBaseline     string
+	DiffCurrent      string
+	DiffOutput       string
+	DiffBaselineMeta string
+	DiffCurrentMeta  string
+	// ScanMeta writes a scan-parameter sidecar next to the JSONL output so a
+	// later diff can detect incompatible probe parameters.
+	ScanMeta bool
 }
 
 // ParseOptions parses the command line options for application
@@ -621,6 +634,16 @@ func ParseOptions() *Options {
 		flagSet.StringVarP(&options.AssetFileUpload, "dashboard-upload", "pdu", "", "upload httpx output file (jsonl) in projectdiscovery cloud (pdcp) UI dashboard"),
 	)
 
+	flagSet.CreateGroup("diff", "Diff (compare two JSONL result files; no probing is performed)",
+		flagSet.BoolVarP(&options.DiffMode, "diff", "", false, "compare two httpx JSONL result files instead of running probes (use -diff-baseline and -diff-current)"),
+		flagSet.StringVarP(&options.DiffBaseline, "diff-baseline", "", "", "path to the previous run's JSONL output (the baseline)"),
+		flagSet.StringVarP(&options.DiffCurrent, "diff-current", "", "", "path to the current run's JSONL output"),
+		flagSet.StringVarP(&options.DiffOutput, "diff-output", "", "", "file to write the JSONL diff report to (default: stdout)"),
+		flagSet.StringVarP(&options.DiffBaselineMeta, "diff-baseline-meta", "", "", "explicit path to the baseline scan metadata sidecar (default: derived next to the baseline JSONL)"),
+		flagSet.StringVarP(&options.DiffCurrentMeta, "diff-current-meta", "", "", "explicit path to the current scan metadata sidecar (default: derived next to the current JSONL)"),
+		flagSet.BoolVarP(&options.ScanMeta, "scan-meta", "", false, "write a scan-parameter metadata sidecar next to the JSONL output for later diff runs"),
+	)
+
 	_ = flagSet.Parse()
 
 	if options.ListOutputFields {
@@ -782,6 +805,20 @@ func (options *Options) ValidateOptions() error {
 
 	if options.InputMode != "" && options.InputFile == "" {
 		return errors.New("-im/-input-mode requires -l/-list to specify an input file")
+	}
+
+	if options.DiffMode {
+		if options.DiffBaseline == "" {
+			return errors.New("-diff requires -diff-baseline pointing to the previous run's JSONL output")
+		}
+		if options.DiffCurrent == "" {
+			return errors.New("-diff requires -diff-current pointing to the current run's JSONL output")
+		}
+		for label, p := range map[string]string{"baseline": options.DiffBaseline, "current": options.DiffCurrent} {
+			if p != "-" && !fileutil.FileExists(p) {
+				return fmt.Errorf("-diff %s file does not exist: %q", label, p)
+			}
+		}
 	}
 
 	if options.MetricsPort < 0 || options.MetricsPort > 65535 {

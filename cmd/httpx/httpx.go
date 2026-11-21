@@ -21,6 +21,13 @@ func main() {
 	// Parse the command line flags and read config files
 	options := runner.ParseOptions()
 
+	// Offline diff mode: compare two existing JSONL result files without
+	// performing any probe. This branch returns before the runner and its
+	// network machinery are constructed.
+	if options.DiffMode {
+		os.Exit(runner.RunDiff(options))
+	}
+
 	// Profiling related code
 	if options.Memprofile != "" {
 		f, err := os.Create(options.Memprofile)
@@ -96,6 +103,10 @@ func main() {
 			gologger.Error().Msgf("Couldn't create resume file: %s\n", err)
 		}
 	}
+
+	// Optional scan-parameter sidecar consumed by a later -diff run. No-op
+	// unless -scan-meta was requested.
+	httpxRunner.WriteScanMetadata()
 
 	httpxRunner.Close()
 }
