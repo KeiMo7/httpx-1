@@ -17,6 +17,7 @@ import (
 	mapsutil "github.com/projectdiscovery/utils/maps"
 	wappalyzer "github.com/projectdiscovery/wappalyzergo"
 
+	"github.com/projectdiscovery/httpx/common/fingerprint"
 	"github.com/projectdiscovery/httpx/common/httpx"
 )
 
@@ -106,6 +107,12 @@ type Result struct {
 	FileNameHash       string                        `json:"-" csv:"-" md:"-" mapstructure:"-"`
 	CPE                []CPEInfo                     `json:"cpe,omitempty" csv:"cpe" md:"cpe" mapstructure:"cpe"`
 	WordPress          *WordPressInfo                `json:"wordpress,omitempty" csv:"wordpress" md:"wordpress" mapstructure:"wordpress"`
+	// Sequence is the output order assigned by the OrderBuffer. It is only
+	// visible in JSON, where 0 is omitted as the first record's sequence.
+	Sequence uint64 `json:"sequence,omitempty" csv:"-" md:"-" mapstructure:"-"`
+	// Fingerprint is the rule based fingerprint of the response. It is nil
+	// unless -fp-rules is configured, so existing output is unchanged.
+	Fingerprint *fingerprint.Fingerprint `json:"fingerprint,omitempty" csv:"-" md:"-" mapstructure:"-"`
 }
 
 type Trace struct {

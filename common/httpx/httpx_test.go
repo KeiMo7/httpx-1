@@ -427,7 +427,6 @@ func TestDo_FollowRedirectsCanceled(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 }
 
-
 type trackingReadCloser struct {
 	closed bool
 }

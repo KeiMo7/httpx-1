@@ -1,0 +1,75 @@
+{
+  "technologies": [
+    "Cloudflare",
+    "Example TLS",
+    "gunicorn",
+    "Jenkins",
+    "NGINX",
+    "nginx",
+    "Some TLS stack",
+    "WordPress"
+  ],
+  "cpes": [
+    {
+      "product": "WordPress",
+      "vendor": "Automattic",
+      "cpe": "cpe:2.3:a:automattic:wordpress:6.0:*:*:*:*:*:*:*"
+    },
+    {
+      "product": "gunicorn",
+      "vendor": "Benny Bottema",
+      "cpe": "cpe:2.3:a:benny_bottema:gunicorn:20.1.0:*:*:*:*:*:*:*"
+    },
+    {
+      "product": "Cloudflare",
+      "vendor": "Cloudflare, Inc.",
+      "cpe": "cpe:2.3:a:cloudflare,_inc.:cloudflare:*:*:*:*:*:*:*:*"
+    },
+    {
+      "product": "Example TLS",
+      "vendor": "Example",
+      "cpe": "cpe:2.3:a:example:example_tls:*:*:*:*:*:*:*:*"
+    },
+    {
+      "product": "Some TLS stack",
+      "vendor": "Example",
+      "cpe": "cpe:2.3:a:example:some_tls_stack:*:*:*:*:*:*:*:*"
+    },
+    {
+      "product": "Jenkins",
+      "vendor": "Jenkins",
+      "cpe": "cpe:2.3:a:jenkins:jenkins:*:*:*:*:*:*:*:*"
+    },
+    {
+      "product": "nginx",
+      "vendor": "NGINX",
+      "cpe": "cpe:2.3:a:nginx:nginx:*:*:*:*:*:*:*:*"
+    },
+    {
+      "product": "NGINX",
+      "vendor": "NGINX Server",
+      "cpe": "cpe:2.3:a:nginx_server:nginx:*:*:*:*:*:*:*:*"
+    }
+  ],
+  "favicon_mmh3": "1522510080",
+  "favicon_md5": "abcdef",
+  "body_hashes": {
+    "md5": "d902799488385df26940aaf2b1fad5cd",
+    "mmh3": "2065889442",
+    "sha1": "2ec0807afdc0459dbe99c1f63c6184958b2db3ad",
+    "sha256": "2be66c0d660615e26a57d8c0f8161f8472b895f3eb1ca1ac478e0a8208ca01e4",
+    "sha512": "1a169c282516192a55b8bc5e1a2d485b0c20fec36b4a3bf2b8d155bb64d5cc17e952d3b024bf8b6dbee26534bcf5cb2583e0ff497191aab20eef20ee7e673450",
+    "simhash": "12763255421100073944"
+  },
+  "header_hashes": {
+    "md5": "18d69eceed063f942bef1aaa93fffa02",
+    "mmh3": "-1495257452",
+    "sha1": "17cd3d2269dfb67145cd610a96de32eb76a1f7fe",
+    "sha256": "a013888d201b883771f6f6749e50f41362a327e50eed3259a82de8c260ec527f",
+    "sha512": "418bf7ab338d3e6d632b712eb6953d71f01d7d98408d3534b5bd12d2c7b892cada29c1e170e3c2ce3eb7f9f3c92ac48558ffb44e4e4fb0da7f1120c351b6ba7f",
+    "simhash": "964822847199492046"
+  },
+  "jarm": "29d29d00029d29d00029d29d00029d29d00029d29d00029d29d00029d29d",
+  "cdn_name": "cloudflare",
+  "rule_digest": "bdf52838ff857a8c89996a65321d88c385cfe646c3f3c4ee270798ac7dd9bd07"
+}

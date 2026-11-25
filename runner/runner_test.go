@@ -649,7 +649,6 @@ func TestProtocolValidation(t *testing.T) {
 	require.Error(t, err)
 }
 
-
 func TestRunner_duplicate(t *testing.T) {
 	const (
 		pageA = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<html><head><title>Welcome</title></head><body>Hello world default page content here</body></html>"
@@ -1350,7 +1349,6 @@ func TestRunner_RateLimiter_Initialization(t *testing.T) {
 		})
 	})
 }
-
 
 func TestExtractPotentialFavIconsURLs_IgnoresAlternateLinks(t *testing.T) {
 	page := []byte(`<html><head>

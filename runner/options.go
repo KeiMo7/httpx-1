@@ -210,24 +210,24 @@ type Options struct {
 	// Deprecated: use Proxy
 	HTTPProxy string
 	// Deprecated: use Proxy
-	SocksProxy                string
-	Proxy                     string
-	InputFile                 string
-	InputMode                 string
-	InputTargetHost           goflags.StringSlice
-	Methods                   string
-	RequestURI                string
-	RequestURIs               string
-	requestURIs               []string
-	OutputMatchStatusCode     string
-	OutputMatchContentLength  string
-	OutputFilterStatusCode    string
+	SocksProxy               string
+	Proxy                    string
+	InputFile                string
+	InputMode                string
+	InputTargetHost          goflags.StringSlice
+	Methods                  string
+	RequestURI               string
+	RequestURIs              string
+	requestURIs              []string
+	OutputMatchStatusCode    string
+	OutputMatchContentLength string
+	OutputFilterStatusCode   string
 	// Deprecated: use OutputFilterPageType with "error" instead.
 	OutputFilterErrorPage bool
-	OutputFilterPageType      goflags.StringSlice
+	OutputFilterPageType  goflags.StringSlice
 	// KnowledgeBase enables knowledge base classification using dit. It is
 	// implied by OutputFilterPageType/OutputFilterErrorPage, which need it.
-	KnowledgeBase             bool
+	KnowledgeBase bool
 	// PageTypeModel overrides the model used by knowledge base classification.
 	// It does not enable classification on its own.
 	PageTypeModel             string
@@ -371,7 +371,7 @@ type Options struct {
 	HeadlessOptionalArguments goflags.StringSlice
 	Protocol                  string
 	OutputFilterErrorPagePath string
-	DisableStdout bool
+	DisableStdout             bool
 
 	JavascriptCodes goflags.StringSlice
 
@@ -401,6 +401,17 @@ type Options struct {
 	ResultDatabaseBatchSize int
 	ResultDatabaseOmitRaw   bool
 
+	// FingerprintRulesPath is a JSONL rule file for -fp-rules. An empty path
+	// disables fingerprinting.
+	FingerprintRulesPath string
+	// FingerprintCacheSize bounds the fingerprint cache; 0 disables it.
+	FingerprintCacheSize int
+	// OrderWindow is the ordering layer capacity; 0 selects the default.
+	OrderWindow int
+	// OrderTimeout is how long a slot may wait for its probe before a
+	// synthetic failure fills it; 0 disables the synthetic record.
+	OrderTimeout time.Duration
+
 	// Optional pre-created objects to reduce allocations
 	Wappalyzer     *wappalyzer.Wappalyze
 	Networkpolicy  *networkpolicy.NetworkPolicy
@@ -423,6 +434,8 @@ func ParseOptions() *Options {
 	)
 
 	flagSet.CreateGroup("Probes", "Probes",
+		flagSet.StringVar(&options.FingerprintRulesPath, "fp-rules", "", "path to a JSONL fingerprint rule file"),
+		flagSet.IntVar(&options.FingerprintCacheSize, "fp-cache-size", 4096, "number of fingerprinted responses to cache (0 disables)"),
 		flagSet.BoolVarP(&options.StatusCode, "status-code", "sc", false, "display response status-code"),
 		flagSet.BoolVarP(&options.ContentLength, "content-length", "cl", false, "display response content-length"),
 		flagSet.BoolVarP(&options.OutputContentType, "content-type", "ct", false, "display response content-type"),
@@ -600,6 +613,8 @@ func ParseOptions() *Options {
 	)
 
 	flagSet.CreateGroup("Optimizations", "Optimizations",
+		flagSet.IntVar(&options.OrderWindow, "order-window", 512, "number of dispatched probes buffered for ordered output"),
+		flagSet.DurationVar(&options.OrderTimeout, "order-timeout", 30*time.Second, "max wait for a probe before emitting an 'order timeout' failure (0 waits forever, for tests only)"),
 		flagSet.BoolVarP(&options.NoFallback, "no-fallback", "nf", false, "display both probed protocol (HTTPS and HTTP)"),
 		flagSet.BoolVarP(&options.NoFallbackScheme, "no-fallback-scheme", "nfs", false, "probe with protocol scheme specified in input "),
 		flagSet.IntVarP(&options.HostMaxErrors, "max-host-error", "maxhr", 30, "max error count per host before skipping remaining path/s"),
@@ -776,6 +791,17 @@ func (options *Options) ValidateOptions() error {
 	if options.SecretFile != "" && !fileutil.FileExists(options.SecretFile) {
 		return fmt.Errorf("secret file '%s' does not exist", options.SecretFile)
 	}
+	if options.FingerprintRulesPath != "" && !fileutil.FileExists(options.FingerprintRulesPath) {
+		return fmt.Errorf("fingerprint rules file '%s' does not exist", options.FingerprintRulesPath)
+	}
+
+	if options.OrderWindow < 0 {
+		return fmt.Errorf("invalid order window %d, must be positive", options.OrderWindow)
+	}
+	if options.OrderTimeout < 0 {
+		return fmt.Errorf("invalid order timeout %s, must not be negative", options.OrderTimeout)
+	}
+
 	if options.InputMode != "" && inputformats.GetFormat(options.InputMode) == nil {
 		return fmt.Errorf("invalid input mode '%s', supported formats: %s", options.InputMode, inputformats.SupportedFormats())
 	}
@@ -982,8 +1008,9 @@ func (options *Options) configureOutput() {
 func (options *Options) configureResume() error {
 	options.resumeCfg = &ResumeCfg{}
 	if options.Resume && fileutil.FileExists(DefaultResumeFile) {
-		return goconfig.Load(&options.resumeCfg, DefaultResumeFile)
-
+		if err := goconfig.Load(&options.resumeCfg, DefaultResumeFile); err != nil {
+			return fmt.Errorf("could not read resume file '%s': %w; delete it to start a fresh scan", DefaultResumeFile, err)
+		}
 	}
 	return nil
 }

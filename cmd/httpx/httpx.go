@@ -89,6 +89,11 @@ func main() {
 
 	httpxRunner.RunEnumeration()
 
+	if err := httpxRunner.OutputError(); err != nil {
+		httpxRunner.Close()
+		gologger.Fatal().Msgf("Could not write output: %s\n", err)
+	}
+
 	if httpxRunner.IsInterrupted() && options.ShouldSaveResume() {
 		gologger.Info().Msgf("Creating resume file: %s\n", runner.DefaultResumeFile)
 		err := httpxRunner.SaveResumeConfig()
@@ -98,6 +103,11 @@ func main() {
 	}
 
 	httpxRunner.Close()
+
+	if httpxRunner.IsInterrupted() {
+		// 128 + SIGINT, the conventional exit code for an interrupted run.
+		os.Exit(130)
+	}
 }
 
 // setupOptionalAssetUpload is used to setup optional asset upload

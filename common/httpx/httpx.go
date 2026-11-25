@@ -692,7 +692,6 @@ func (httpx *HTTPX) Sanitize(respStr string, trimLine, normalizeSpaces bool) str
 	return respStr
 }
 
-
 type readCloser struct {
 	io.Reader
 	io.Closer

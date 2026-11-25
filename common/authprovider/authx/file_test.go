@@ -221,8 +221,8 @@ func TestSecretValidate(t *testing.T) {
 		{
 			name: "case insensitive type",
 			secret: Secret{
-				Type:    "basicauth",
-				Domains: []string{"example.com"},
+				Type:     "basicauth",
+				Domains:  []string{"example.com"},
 				Username: "user",
 				Password: "pass",
 			},
@@ -331,10 +331,10 @@ static:
 
 func TestSecretGetStrategy(t *testing.T) {
 	tests := []struct {
-		name       string
-		secret     Secret
-		wantType   string
-		wantNil    bool
+		name     string
+		secret   Secret
+		wantType string
+		wantNil  bool
 	}{
 		{
 			name: "basic auth strategy",
